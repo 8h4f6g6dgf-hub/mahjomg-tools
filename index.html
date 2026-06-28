@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>収支計算ツール</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      background: #f5f6f8;
+      color: #222;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 14px 40px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin: 12px 0 4px;
+    }
+
+    .sub {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 18px;
+      line-height: 1.6;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 190px;
+      resize: vertical;
+      border: 1px solid #d5d8de;
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 16px;
+      line-height: 1.6;
+      background: #fff;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: #6b8afd;
+      box-shadow: 0 0 0 3px rgba(107, 138, 253, 0.15);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .primary {
+      background: #222;
+      color: #fff;
+    }
+
+    .secondary {
+      background: #e8ebf0;
+      color: #222;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e3e5e8;
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    }
+
+    .card h2 {
+      font-size: 18px;
+      margin: 0 0 10px;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #f7f8fa;
+      border-radius: 12px;
+      padding: 12px;
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid #eef0f3;
+      font-size: 17px;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .plus {
+      color: #0a7a32;
+      font-weight: 700;
+    }
+
+    .minus {
+      color: #c33131;
+      font-weight: 700;
+    }
+
+    .zero {
+      color: #555;
+      font-weight: 700;
+    }
+
+    .warn {
+      color: #b45f00;
+      font-weight: 700;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #777;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      background: #222;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    @media (max-width: 420px) {
+      .buttons {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>収支計算ツール</h1>
+    <div class="sub">
+      名前と数字を貼って「計算」。全角＋/−、コロン、スペース混在OK。<br>
+      例：たい：510 -6230
+    </div>
+
+    <textarea id="input" placeholder="たい：510 -6230
+まさ：+5510 -340
+ゆひ：+20550 6100
+くり：-26570 470"></textarea>
+
+    <div class="buttons">
+      <button class="primary" onclick="calculate()">計算する</button>
+      <button class="secondary" onclick="clearAll()">クリア</button>
+    </div>
+
+    <div class="card">
+      <h2>結果</h2>
+      <div id="result">まだ計算してないよ</div>
+      <div id="check" class="small"></div>
+    </div>
+
+    <div class="card">
+      <h2>コピペ用（プラス順）</h2>
+      <pre id="copyText"></pre>
+      <div class="buttons">
+        <button class="primary" onclick="copyResult()">結果をコピー</button>
+        <button class="secondary" onclick="insertSample()">サンプル入力</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">コピーしたよ</div>
+
+  <script>
+    function normalizeText(text) {
+      return text
+        .replace(/[＋]/g, '+')
+        .replace(/[−ー―－]/g, '-')
+        .replace(/[：]/g, ':')
+        .replace(/,/g, '');
+    }
+
+    function calculate() {
+      const raw = document.getElementById('input').value;
+      const text = normalizeText(raw);
+      const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+
+      const totals = {};
+      const details = {};
+      const warnings = [];
+
+      lines.forEach((line, index) => {
+        const nameMatch = line.match(/^([^\s:]+)\s*:?\s*(.*)$/);
+        if (!nameMatch) {
+          warnings.push(`${index + 1}行目を読み取れなかった`);
+          return;
+        }
+
+        const name = nameMatch[1].trim();
+        const rest = nameMatch[2];
+
+        const nums = rest.match(/[+-]?\d+/g);
+        if (!name || !nums) {
+          warnings.push(`${index + 1}行目に数字が見つからなかった`);
+          return;
+        }
+
+        if (!totals[name]) {
+          totals[name] = 0;
+          details[name] = [];
+        }
+
+        nums.forEach(n => {
+          const value = Number(n);
+          totals[name] += value;
+          details[name].push(value);
+        });
+      });
+
+      const entries = Object.entries(totals)
+        .sort((a, b) => b[1] - a[1]);
+
+      if (entries.length === 0) {
+        document.getElementById('result').innerHTML = '読み取れるデータがなかったよ';
+        document.getElementById('copyText').textContent = '';
+        document.getElementById('check').textContent = '';
+        return;
+      }
+
+      const resultHtml = entries.map(([name, total]) => {
+        const cls = total > 0 ? 'plus' : total < 0 ? 'minus' : 'zero';
+        const sign = total > 0 ? '+' : '';
+        return `<div class="row"><span>${escapeHtml(name)}</span><span class="${cls}">${sign}${total}</span></div>`;
+      }).join('');
+
+      const grandTotal = entries.reduce((sum, [, total]) => sum + total, 0);
+      const grandCls = grandTotal > 0 ? 'plus' : grandTotal < 0 ? 'minus' : 'zero';
+      const grandSign = grandTotal > 0 ? '+' : '';
+
+      let warningHtml = '';
+      if (warnings.length > 0) {
+        warningHtml = `<div class="warn">${warnings.map(escapeHtml).join('<br>')}</div>`;
+      }
+
+      document.getElementById('result').innerHTML =
+        resultHtml +
+        `<div class="row"><span>合計</span><span class="${grandCls}">${grandSign}${grandTotal}</span></div>` +
+        warningHtml;
+
+      const copy = entries.map(([name, total]) => {
+        const sign = total > 0 ? '+' : '';
+        return `${name} ${sign}${total}`;
+      }).join('\n');
+
+      document.getElementById('copyText').textContent = copy;
+      document.getElementById('check').textContent =
+        grandTotal === 0
+          ? '検算OK：合計は0'
+          : `検算注意：合計が${grandSign}${grandTotal}になってる`;
+    }
+
+    async function copyResult() {
+      const text = document.getElementById('copyText').textContent;
+      if (!text.trim()) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('コピーしたよ');
+      } catch (e) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showToast('コピーしたよ');
+      }
+    }
+
+    function clearAll() {
+      document.getElementById('input').value = '';
+      document.getElementById('result').textContent = 'まだ計算してないよ';
+      document.getElementById('copyText').textContent = '';
+      document.getElementById('check').textContent = '';
+    }
+
+    function insertSample() {
+      document.getElementById('input').value =
+`たい：510 -6230
+まさ：+5510 -340
+ゆひ：+20550 6100
+くり：-26570 470`;
+      calculate();
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1400);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
