@@ -1,0 +1,12 @@
+{
+  "name": "麻雀収支ツール v2.1.0",
+  "short_name": "麻雀収支",
+  "description": "麻雀の対局収支を自動計算・保存・履歴管理できるツール。v2.0.0でMトーナメントデータを外部JSON化。",
+  "start_url": "./?v=2.0.0",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#0f5132",
+  "orientation": "portrait-primary",
+  "icons": []
+}
